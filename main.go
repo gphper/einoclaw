@@ -4,14 +4,19 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"einoclaw/skills"
 	"einoclaw/tools"
 
+	"github.com/cloudwego/eino-ext/adk/backend/local"
 	arkmodel "github.com/cloudwego/eino-ext/components/model/ark"
 	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/adk/middlewares/filesystem"
+	"github.com/cloudwego/eino/adk/middlewares/skill"
 	"github.com/cloudwego/eino/compose"
 )
 
@@ -69,6 +74,50 @@ func main() {
 	}
 	fmt.Println()
 
+	// 加载skill
+	pwd, _ := os.Getwd()
+	// workDir := filepath.Join(pwd, "adk", "middlewares", "skill", "workdir")
+	skillsDir := filepath.Join(pwd, "skills")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 使用 Sandbox Backend 替代 Local Backend（Windows 兼容）
+	// 注意：需要配置火山引擎 AgentKit 的访问密钥
+	be, err := local.NewBackend(ctx, &local.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 使用自定义的 Windows Shell 来支持 Windows PowerShell
+	windowsShell := tools.NewWindowsShell("")
+
+	fsm, err := filesystem.New(ctx, &filesystem.MiddlewareConfig{
+		Backend: be,
+		Shell:   windowsShell,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	skillBackend, err := skill.NewBackendFromFilesystem(ctx, &skill.BackendFromFilesystemConfig{
+		Backend: be,
+		BaseDir: skillsDir,
+	})
+	if err != nil {
+		log.Fatalf("Failed to create skill backend: %v", err)
+	}
+
+	// 使用自定义 Backend 包装原始 Backend
+	customSkillBackend := skills.NewCustomBackend(skillBackend)
+
+	sm, err := skill.NewMiddleware(ctx, &skill.Config{
+		Backend: customSkillBackend,
+	})
+	if err != nil {
+		log.Fatalf("Failed to create skill middleware: %v", err)
+	}
+
 	fmt.Println("4. 创建 ChatModelAgent...")
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name:        "ark-coding-agent",
@@ -79,6 +128,7 @@ func main() {
 				Tools: loadedTools,
 			},
 		},
+		Handlers: []adk.ChatModelAgentMiddleware{fsm, sm},
 	})
 	if err != nil {
 		fmt.Printf("   创建 Agent 失败: %v\n", err)

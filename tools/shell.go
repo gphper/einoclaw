@@ -131,6 +131,11 @@ func NewShellTool(workingDir string, restrict bool) *ShellTool {
 
 // InvokableRun 执行命令
 func (t *ShellTool) InvokableRun(ctx context.Context, args string, opts ...tool.Option) (string, error) {
+
+	log.Println("*****开始执行命令******")
+	log.Println(args)
+	log.Println("*****结束执行命令******")
+
 	// 解析 JSON 参数
 	var params map[string]any
 	if err := parseJSON(args, &params); err != nil {
