@@ -51,8 +51,8 @@ func NewReadFileTool(workspace string, restrict bool, maxReadFileSize int) *Read
 	return &ReadFileTool{
 		BaseTool: BaseTool{
 			info: &schema.ToolInfo{
-				Name:       "read_file",
-				Desc:       "Read contents of a file. Supports pagination via offset and length",
+				Name:        "read_file",
+				Desc:        "Read contents of a file. Supports pagination via offset and length",
 				ParamsOneOf: schema.NewParamsOneOfByParams(params),
 			},
 		},
@@ -105,6 +105,11 @@ func (t *ReadFileTool) InvokableRun(ctx context.Context, args string, opts ...to
 	// 读取文件
 	file, err := os.Open(validPath)
 	if err != nil {
+
+		if os.IsNotExist(err) {
+
+			return fmt.Sprintf("[FILE NOT FOUND] The file %s does not exist.", validPath), nil
+		}
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()

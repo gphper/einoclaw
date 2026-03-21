@@ -9,15 +9,19 @@ import (
 	"path/filepath"
 	"strings"
 
-	"einoclaw/skills"
+	"einoclaw/agent"
+	"einoclaw/middlewares"
 	"einoclaw/tools"
 
 	"github.com/cloudwego/eino-ext/adk/backend/local"
 	arkmodel "github.com/cloudwego/eino-ext/components/model/ark"
+
+	// "github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/adk/middlewares/filesystem"
 	"github.com/cloudwego/eino/adk/middlewares/skill"
+	"github.com/cloudwego/eino/adk/prebuilt/deep"
 	"github.com/cloudwego/eino/compose"
+	"github.com/cloudwego/eino/schema"
 )
 
 func main() {
@@ -89,17 +93,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// 使用自定义的 Windows Shell 来支持 Windows PowerShell
-	windowsShell := tools.NewWindowsShell("")
-
-	fsm, err := filesystem.New(ctx, &filesystem.MiddlewareConfig{
-		Backend: be,
-		Shell:   windowsShell,
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	skillBackend, err := skill.NewBackendFromFilesystem(ctx, &skill.BackendFromFilesystemConfig{
 		Backend: be,
 		BaseDir: skillsDir,
@@ -109,26 +102,33 @@ func main() {
 	}
 
 	// 使用自定义 Backend 包装原始 Backend
-	customSkillBackend := skills.NewCustomBackend(skillBackend)
+	// customSkillBackend := skills.NewCustomBackend(skillBackend)
 
 	sm, err := skill.NewMiddleware(ctx, &skill.Config{
-		Backend: customSkillBackend,
+		Backend: skillBackend,
 	})
 	if err != nil {
 		log.Fatalf("Failed to create skill middleware: %v", err)
 	}
 
 	fmt.Println("4. 创建 ChatModelAgent...")
-	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+
+	// 创建系统提示词构建器
+	contextBuilder := agent.NewContextBuilder(workspace)
+	agent, err := deep.New(ctx, &deep.Config{
 		Name:        "ark-coding-agent",
 		Description: "使用火山引擎 Coding Plain 模型的编程助手",
-		Model:       arkChatModel,
+		ChatModel:   arkChatModel,
+		Instruction: contextBuilder.BuildInstruction(),
 		ToolsConfig: adk.ToolsConfig{
 			ToolsNodeConfig: compose.ToolsNodeConfig{
 				Tools: loadedTools,
 			},
 		},
-		Handlers: []adk.ChatModelAgentMiddleware{fsm, sm},
+		Handlers: []adk.ChatModelAgentMiddleware{
+			sm,
+			&middlewares.SafeToolMiddleware{},
+		},
 	})
 	if err != nil {
 		fmt.Printf("   创建 Agent 失败: %v\n", err)
@@ -144,6 +144,9 @@ func main() {
 	fmt.Println("=====================================")
 
 	reader := bufio.NewReader(os.Stdin)
+
+	var conversationHistory []adk.Message
+
 	for {
 		fmt.Print("\n> ")
 		input, err := reader.ReadString('\n')
@@ -163,11 +166,15 @@ func main() {
 			break
 		}
 
+		userMessage := schema.UserMessage(query)
+		conversationHistory = append(conversationHistory, userMessage)
+
 		fmt.Printf("查询: %s\n", query)
-		iter := runner.Query(ctx, query)
+		iter := runner.Run(ctx, conversationHistory)
 
 		fmt.Println("处理中...")
 		eventCount := 0
+		var aiResponse string
 		for {
 			event, ok := iter.Next()
 			if !ok {
@@ -178,12 +185,25 @@ func main() {
 			if event.Output != nil && event.Output.MessageOutput != nil {
 				msg, err := event.Output.MessageOutput.GetMessage()
 				if err == nil && msg != nil {
-					fmt.Printf("AI: %s\n", msg.Content)
+					switch event.Output.MessageOutput.Role {
+					case schema.Tool:
+						fmt.Printf("%s 工具结果: %s\n", event.Output.MessageOutput.ToolName, msg.Content)
+						toolMessage := schema.ToolMessage(msg.Content, event.Output.MessageOutput.ToolName)
+						conversationHistory = append(conversationHistory, toolMessage)
+					case schema.Assistant:
+						fmt.Printf("AI: %s\n", msg.Content)
+						aiResponse = msg.Content
+					}
 				}
 			}
 			if event.Err != nil {
 				fmt.Printf("错误: %v\n", event.Err)
 			}
+		}
+
+		if aiResponse != "" {
+			assistantMessage := schema.AssistantMessage(aiResponse, nil)
+			conversationHistory = append(conversationHistory, assistantMessage)
 		}
 	}
 

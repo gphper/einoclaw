@@ -2,7 +2,6 @@ package skills
 
 import (
 	"context"
-	"log"
 	"strings"
 
 	"github.com/cloudwego/eino/adk/middlewares/skill"
@@ -24,8 +23,6 @@ func NewCustomBackend(baseBackend skill.Backend) *CustomBackend {
 func (cb *CustomBackend) List(ctx context.Context) ([]skill.FrontMatter, error) {
 
 	tmp, err := cb.baseBackend.List(ctx)
-
-	log.Printf("%+v", tmp)
 
 	return tmp, err
 }

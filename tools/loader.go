@@ -1,8 +1,6 @@
 package tools
 
 import (
-	"os"
-
 	"github.com/cloudwego/eino/components/tool"
 )
 
@@ -28,15 +26,11 @@ func LoadTools(workspace string, restrict bool) []tool.BaseTool {
 	shellTool := NewShellTool(workspace, restrict)
 	tools = append(tools, shellTool)
 
-	// 加载网络搜索工具
-	// 优先使用 SearXNG，如果没有配置则使用 DuckDuckGo
-	searxngURL := os.Getenv("SEARXNG_URL")
-	providerType := "duckduckgo"
-	if searxngURL != "" {
-		providerType = "searxng"
+	// 加载网页获取工具
+	webFetchTool, err := NewWebFetchTool(0, 0)
+	if err == nil {
+		tools = append(tools, webFetchTool)
 	}
-	webSearchTool := NewWebSearchTool(providerType, searxngURL, 5)
-	tools = append(tools, webSearchTool)
 
 	return tools
 }

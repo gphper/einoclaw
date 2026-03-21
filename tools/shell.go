@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -131,10 +130,6 @@ func NewShellTool(workingDir string, restrict bool) *ShellTool {
 
 // InvokableRun 执行命令
 func (t *ShellTool) InvokableRun(ctx context.Context, args string, opts ...tool.Option) (string, error) {
-
-	log.Println("*****开始执行命令******")
-	log.Println(args)
-	log.Println("*****结束执行命令******")
 
 	// 解析 JSON 参数
 	var params map[string]any
@@ -274,12 +269,8 @@ func (t *ShellTool) guardCommand(command, cwd string) string {
 	cmd := strings.TrimSpace(command)
 	lower := strings.ToLower(cmd)
 
-	log.Println(lower)
-
 	explicitlyAllowed := false
 	for _, pattern := range t.customAllowPatterns {
-
-		log.Println(pattern.String())
 
 		if pattern.MatchString(lower) {
 			explicitlyAllowed = true

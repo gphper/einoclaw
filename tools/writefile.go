@@ -77,6 +77,11 @@ func (t *WriteFileTool) InvokableRun(ctx context.Context, args string, opts ...t
 		}
 	}
 
+	// 检查路径是否是目录
+	if info, err := os.Stat(validPath); err == nil && info.IsDir() {
+		return "", fmt.Errorf("path is a directory: %s", validPath)
+	}
+
 	// 写入文件
 	if err := os.WriteFile(validPath, []byte(content), 0644); err != nil {
 		return "", fmt.Errorf("failed to write file: %w", err)
