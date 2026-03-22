@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -22,7 +23,6 @@ const (
 
 // 预编译的正则表达式
 var (
-	reTags       = regexp.MustCompile(`<[^>]+>`)
 	reDDGLink    = regexp.MustCompile(`<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)</a>`)
 	reDDGSnippet = regexp.MustCompile(`<a class="result__snippet[^"]*".*?>([\s\S]*?)</a>`)
 )
@@ -135,6 +135,8 @@ func (p *SearXNGSearchProvider) Search(ctx context.Context, query string, count 
 	searchURL := fmt.Sprintf("%s/search?q=%s&format=json&categories=general",
 		strings.TrimSuffix(p.baseURL, "/"),
 		url.QueryEscape(query))
+
+	log.Println(searchURL)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
 	if err != nil {

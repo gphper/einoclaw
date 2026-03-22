@@ -27,6 +27,7 @@ const (
 var (
 	reScript     = regexp.MustCompile(`<script[\s\S]*?</script>`)
 	reStyle      = regexp.MustCompile(`<style[\s\S]*?</style>`)
+	reTags       = regexp.MustCompile(`<[^>]+>`)
 	reWhitespace = regexp.MustCompile(`[^\S\n]+`)
 	reBlankLines = regexp.MustCompile(`\n{3,}`)
 )
